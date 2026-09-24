@@ -230,6 +230,24 @@ several iterations in a single turn. You'll see `iter 4`, `iter 5`… on the Loo
 LOOP box pulse for each cycle. `search_web` works keyless via DuckDuckGo but that endpoint
 rate-limits bots, so for a clean take set a free `TAVILY_API_KEY` (see [`.env.example`](.env.example)).
 
+## Safe agent execution — humans approve consequential actions
+
+Tini classifies tools by risk at registration time. Read-only tools run immediately,
+while medium/high-risk actions such as creating calendar events, drafting messages, or
+delegating code are persisted to `state.db` without executing. The model cannot approve
+its own request: approval is a gateway command issued by the human.
+
+```text
+/pending          # inspect queued tool name, risk level, and arguments
+/approve 12       # execute pending action #12 exactly once
+/reject 12        # close it without invoking the tool
+```
+
+Every request, approval, rejection, and automatic low-risk execution is written to the
+`tool_audit` table. Secret-like argument fields are redacted in the audit record. Set
+`TINI_SAFE_EXECUTION=0` only in a trusted automation environment that intentionally
+allows sensitive tools to run without confirmation.
+
 ## Graph workflows — when a turn needs shape
 
 The loop is one agent turn: the model picks tools until it stops, and that covers chat.

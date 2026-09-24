@@ -126,6 +126,11 @@ class Settings:
     experimental: bool = field(
         default_factory=lambda: os.getenv("TINI_EXPERIMENTAL", "") in ("1", "true", "yes")
     )
+    # Human-in-the-loop guardrail. Sensitive tools are queued until the human
+    # approves them through a gateway command. Safe by default.
+    safe_execution: bool = field(
+        default_factory=lambda: os.getenv("TINI_SAFE_EXECUTION", "1") in ("1", "true", "yes")
+    )
     # Route every message through the triage graph workflow first (a small model
     # classifies it; trivial messages get a fast small-model reply, real tasks
     # run the normal loop as a graph node). Any failure anywhere fails open to

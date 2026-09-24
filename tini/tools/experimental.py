@@ -430,6 +430,8 @@ def make_delegate_tool(settings: Settings) -> Tool:
         },
         fn=delegate_task,
         wants_notify=True,   # streams pi's live events through the loop's observer
+        risk_level="high",
+        requires_approval=True,
     )
 
 

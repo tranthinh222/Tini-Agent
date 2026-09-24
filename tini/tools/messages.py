@@ -36,4 +36,6 @@ def make_tool(home: Path) -> Tool:
             "required": ["to", "body"],
         },
         fn=send_message,
+        risk_level="high",
+        requires_approval=True,
     )

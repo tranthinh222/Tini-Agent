@@ -482,6 +482,8 @@ def make_tool(
             "required": ["title", "start"],
         },
         fn=create_event,
+        risk_level="medium",
+        requires_approval=True,
     )
 
 

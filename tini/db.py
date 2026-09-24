@@ -73,6 +73,32 @@ CREATE TABLE IF NOT EXISTS chat_log (
     session_id TEXT DEFAULT 'default',
     created_at TEXT DEFAULT (datetime('now'))
 );
+
+-- Human-in-the-loop safety. Sensitive tools create a pending action instead
+-- of executing immediately; only a gateway command from the human can resolve
+-- it. Arguments stay local in state.db and audit rows store a redacted copy.
+CREATE TABLE IF NOT EXISTS pending_actions (
+    id INTEGER PRIMARY KEY,
+    tool_name TEXT NOT NULL,
+    arguments TEXT NOT NULL,
+    risk_level TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at TEXT DEFAULT (datetime('now')),
+    resolved_at TEXT,
+    result TEXT
+);
+
+CREATE TABLE IF NOT EXISTS tool_audit (
+    id INTEGER PRIMARY KEY,
+    action_id INTEGER,
+    tool_name TEXT NOT NULL,
+    arguments TEXT NOT NULL,
+    risk_level TEXT NOT NULL,
+    decision TEXT NOT NULL,
+    status TEXT NOT NULL,
+    result TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
 """
 
 

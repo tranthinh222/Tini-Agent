@@ -12,7 +12,7 @@ from tini.tools.registry import ToolRegistry
 
 
 def build_registry(conn: sqlite3.Connection, settings: Settings, memory=None) -> ToolRegistry:
-    registry = ToolRegistry()
+    registry = ToolRegistry(conn=conn, enforce_approval=settings.safe_execution)
     registry.register(
         calendar.make_tool(
             conn,

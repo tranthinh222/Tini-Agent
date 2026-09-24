@@ -78,7 +78,8 @@ def make_tini(home: Path, client=None, **settings_overrides):
     # happened to `graph_workflows` here. Filtering keeps this list a superset
     # that costs nothing when an entry is absent.
     known = {f.name for f in dataclasses.fields(Settings)}
-    for switch in ("apple_calendar", "google_calendar", "apple_tools", "graph_workflows"):
+    for switch in ("apple_calendar", "google_calendar", "apple_tools", "graph_workflows",
+                   "safe_execution"):
         if switch in known:
             settings_overrides.setdefault(switch, False)
     settings = Settings(home=home, **settings_overrides)

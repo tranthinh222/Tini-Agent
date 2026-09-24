@@ -58,7 +58,7 @@ def main() -> None:
     console.print(Panel.fit(
         "[bold]Tini[/bold] — local, yours, transparent.\n"
         f"home: {tini.settings.home.resolve()}   model: {tini.settings.model}\n"
-        "Commands: /memory · /quit",
+        "Commands: /memory · /pending · /approve <id> · /reject <id> · /quit",
         border_style="cyan",
     ))
     while True:
@@ -78,6 +78,30 @@ def main() -> None:
                     border_style="cyan",
                 )
             )
+            continue
+        if user_message == "/pending":
+            rows = tini.tools.pending()
+            if not rows:
+                console.print("[dim]No pending actions.[/dim]")
+            else:
+                for row in rows:
+                    console.print(f"[yellow]#{row['id']}[/yellow] {row['tool_name']} ({row['risk_level']}) {row['arguments']}")
+            continue
+        if user_message.startswith("/approve "):
+            try:
+                action_id = int(user_message.split(maxsplit=1)[1])
+            except ValueError:
+                console.print("[red]Usage: /approve <numeric-id>[/red]")
+                continue
+            console.print(tini.tools.approve(action_id, notify=_observer))
+            continue
+        if user_message.startswith("/reject "):
+            try:
+                action_id = int(user_message.split(maxsplit=1)[1])
+            except ValueError:
+                console.print("[red]Usage: /reject <numeric-id>[/red]")
+                continue
+            console.print(tini.tools.reject(action_id))
             continue
         result = tini.respond(user_message, observer=_observer, source="cli")
         console.print(f"[bold green]tini ›[/bold green] {result.reply}\n")

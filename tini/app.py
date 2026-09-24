@@ -39,8 +39,13 @@ class Tini:
         if self.mcp_bridge is not None:
             self.mcp_bridge.close()
 
-    def respond(self, user_message: str, observer: Observer | None = None,
-                source: str = "cli", stream: bool = False) -> LoopResult:
+    def respond(
+        self,
+        user_message: str,
+        observer: Observer | None = None,
+        source: str = "cli",
+        stream: bool = False,
+    ) -> LoopResult:
         """One full turn: assemble working memory → run the loop → persist.
         `source` tags which gateway the message arrived through (cli / voice /
         telegram / dashboard), so the unified chat can show its origin.
@@ -49,6 +54,7 @@ class Tini:
         # capture the gate + graph decisions as they flow by, so we can persist
         # them with the turn (the reopened-thread telemetry the dashboard shows)
         import time
+
         captured: dict = {}
 
         def _capture(kind, ev):
@@ -66,6 +72,7 @@ class Tini:
                 captured["triage_reason"] = ev.get("reason")
             if kind == "graph_end":
                 captured["graph_path"] = ev.get("path")
+
         notify = compose(observer, self.tracer.event, _capture)
         t0 = time.perf_counter()
 
@@ -79,8 +86,10 @@ class Tini:
                 try:
                     result = self._respond_via_graph(user_message, notify, stream)
                 except Exception as exc:
-                    notify("graph_end", {"workflow": "triage", "ms": 0, "steps": 0,
-                                         "path": [], "error": repr(exc)})
+                    notify(
+                        "graph_end",
+                        {"workflow": "triage", "ms": 0, "steps": 0, "path": [], "error": repr(exc)},
+                    )
                     result = None
             if result is None:
                 result = self._run_full_turn(user_message, notify, stream)
@@ -89,31 +98,42 @@ class Tini:
 
             def _status(out: str) -> str:
                 low = (out or "").lower()
-                return "error" if ("failed" in low or "timed out" in low
-                                   or low.startswith("error")) else "ok"
+                return (
+                    "error"
+                    if ("failed" in low or "timed out" in low or low.startswith("error"))
+                    else "ok"
+                )
+
             meta = {
                 "gate": captured.get("gate"),
-                "graph": ({"workflow": "triage",
-                           "route": "quick" if quick else "full",
-                           "reason": captured.get("triage_reason", ""),
-                           "path": captured.get("graph_path")}
-                          if "graph_route" in captured else None),
+                "graph": (
+                    {
+                        "workflow": "triage",
+                        "route": "quick" if quick else "full",
+                        "reason": captured.get("triage_reason", ""),
+                        "path": captured.get("graph_path"),
+                    }
+                    if "graph_route" in captured
+                    else None
+                ),
                 "iterations": result.iterations,
                 "usage": result.usage,
                 "latency_ms": int((time.perf_counter() - t0) * 1000),
-                "tools": [{"tool": c["tool"], "status": _status(c["output"])}
-                          for c in result.tool_calls],
+                "tools": [
+                    {"tool": c["tool"], "status": _status(c["output"])} for c in result.tool_calls
+                ],
                 # which brain answered this turn — so a reopened thread (or a
                 # thread you switched models mid-way) shows it per card. A quick
                 # graph turn was answered by the small model; say so honestly.
                 "model": self.settings.small_model if quick else self.settings.model,
                 "provider": self.settings.provider,
             }
-            self.session.add_exchange(user_message, result.reply, tool_calls=result.tool_calls,
-                                      source=source, meta=meta)
+            self.session.add_exchange(
+                user_message, result.reply, tool_calls=result.tool_calls, source=source, meta=meta
+            )
             if self.memory is not None:
                 self.memory.maybe_consolidate(notify=notify)
-                self.memory.export_markdown()   # keep MEMORY.md in sync
+                self.memory.export_markdown()  # keep MEMORY.md in sync
 
         self.tracer.end_turn(result.reply, result.iterations)
         return result
@@ -154,15 +174,31 @@ class Tini:
             todays_events,
         )
 
+        quick_usage = {"in": 0, "out": 0, "calls": 0}
+
         def quick_reply(state: dict) -> str:
-            prompt = QUICK_REPLY_PROMPT.format(calendar=state.get("calendar", ""),
-                                               message=state["message"])
+            prompt = QUICK_REPLY_PROMPT.format(
+                calendar=state.get("calendar", ""), message=state["message"]
+            )
             response = self.client.messages.create(
-                model=self.settings.small_model, max_tokens=600,
-                messages=[{"role": "user", "content": prompt}])
-            notify("llm", {"iteration": 1, "stop_reason": response.stop_reason,
-                           "usage": {"in": response.usage.input_tokens,
-                                     "out": response.usage.output_tokens}})
+                model=self.settings.small_model,
+                max_tokens=600,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            quick_usage.update(
+                {"in": response.usage.input_tokens, "out": response.usage.output_tokens, "calls": 1}
+            )
+            notify(
+                "quick_llm",
+                {
+                    "iteration": 1,
+                    "stop_reason": response.stop_reason,
+                    "usage": {
+                        "in": response.usage.input_tokens,
+                        "out": response.usage.output_tokens,
+                    },
+                },
+            )
             return "".join(b.text for b in response.content if b.type == "text")
 
         graph = build_triage_graph(
@@ -172,12 +208,12 @@ class Tini:
             # the full path is the SAME method the flag-off default runs; the
             # engine's tagged notifier stamps its inner events with node=
             full_fn=lambda state: self._run_full_turn(
-                state["message"], state.get("_notify", notify), stream),
+                state["message"], state.get("_notify", notify), stream
+            ),
         )
         state = run_graph(graph, {"message": user_message}, observer=notify)
         if isinstance(state.get("result"), LoopResult):
             return state["result"]
         if state.get("reply"):
-            usage = captured.get("usage", {"in": 0, "out": 0, "calls": 0})
-            return LoopResult(reply=state["reply"], tool_calls=[], iterations=1, usage=usage)
+            return LoopResult(reply=state["reply"], tool_calls=[], iterations=1, usage=quick_usage)
         return None  # graph produced nothing → caller falls open to the loop
